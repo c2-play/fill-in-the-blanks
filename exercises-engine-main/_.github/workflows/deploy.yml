@@ -1,0 +1,56 @@
+name: Deploy to surge.sh
+run-name: Deploy to surge.sh 🚀
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+jobs:
+    Deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out repository code
+              uses: actions/checkout@v2
+
+            - name: Clear data directory
+              run: rm -rf ./data/*
+
+            - name: Get exercises data
+              uses: actions/checkout@v2
+              with:
+                  repository: "${{ secrets.EXERCISES_REPO }}"
+                  token: "${{ secrets._GITHUB_TOKEN }}"
+                  path: "./data"
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v3
+              with:
+                  node-version: 18.x
+                  cache: "npm"
+
+            - name: Install dependencies
+              run: npm install
+
+            - name: Cache next.js build
+              uses: actions/cache@v3
+              with:
+                  path: |
+                      ~/.npm
+                      ${{ github.workspace }}/.next/cache
+                  # Generate a new cache whenever packages or source files change.
+                  key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+                  # If source files changed but packages didn't, rebuild from a prior cache.
+                  restore-keys: |
+                      ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+
+            - name: Build
+              run: npm run build
+
+            - name: Deploy to surge.sh
+              uses: dswistowski/surge-sh-action@v1.0.1
+              with:
+                  project: ./out
+                  domain: ${{ secrets.SURGE_DOMAIN }}
+                  login: ${{ secrets.SURGE_LOGIN }}
+                  token: ${{ secrets.SURGE_TOKEN }}
